@@ -1,6 +1,6 @@
 {
     "name": "@optio-labs/comms-bridge",
-    "version": "0.0.1",
+    "version": "0.0.2",
     "description": "The library implements a \"communications bridge\" between endpoints in a multi-node messaging network.",
     "main": "build/index.js",
     "types": "build/index.d.ts",

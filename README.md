@@ -6,10 +6,16 @@ For instance, it can be used for messaging between the multiple processes requir
 
 ## Usage
 
+Install the library:
+
+```bash
+npm install --save @optio-labs/comms-bridge
+```
+
 Import the library:
 
 ```javascript
-import { CommsBridge } from "comms-bridge";
+import { CommsBridge } from "@optio-labs/comms-bridge";
 ```
 
 Create an instance of the comms bridge:
