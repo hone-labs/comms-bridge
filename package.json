@@ -15,9 +15,9 @@
         "build:watch": "tsc  --incremental --watch",
         "prepublishOnly": "npm test && npm run clean && tsc",
         "t": "npm run test",
-        "test": "jest",
+        "test": "jest --runInBand --passWithNoTests",
         "tw": "npm run test:watch",
-        "test:watch": "jest --watch"
+        "test:watch": "jest --watch --runInBand --passWithNoTests"
     },
     "keywords": [],
     "author": "ashley@codecapers.com.au",
