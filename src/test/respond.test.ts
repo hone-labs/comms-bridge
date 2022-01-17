@@ -1,4 +1,4 @@
-import { CommsBridge, onIncomingMessageFn } from "../index";
+import { CommsBridge, IMessage, onIncomingMessageFn } from "../index";
 
 describe("receiving", () => {
 
@@ -64,6 +64,42 @@ describe("receiving", () => {
         //
         expect(incomingMessageHandler).toBeDefined();
         incomingMessageHandler!(mockMessage);
+    });
+
+    it("incoming message is automatically forwarded when not targeted at the current instance", () => {
+
+        let messageForwarded = false;
+        const id = "my-instance-id";
+        const messagePayload = {};
+        const mockMessage: any = {            
+            targetId: "some-other-instance-id",
+            name: "an-event",
+            payload: messagePayload,
+        };
+
+        const commsBridge = new CommsBridge(id);
+
+        let incomingMessageHandler: onIncomingMessageFn | undefined = undefined;
+        const mockIncoming: any = {
+            connect: (handler: onIncomingMessageFn) => {
+                incomingMessageHandler = handler;
+            },
+        };
+        commsBridge.addIncoming("incoming-id", mockIncoming);
+
+        commsBridge.addOutgoing("outgoing-id", {
+            send: (msg: IMessage) => {
+                expect(msg).toBe(mockMessage);
+                messageForwarded = true;
+            },
+        });
+
+        incomingMessageHandler!(mockMessage);
+
+        //
+        // Check the message was forwarded to the output transport.
+        //
+        expect(messageForwarded).toEqual(true);        
     });
 
     //
