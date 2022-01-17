@@ -216,7 +216,7 @@ export class CommsBridge implements ICommsBridge {
         }
 
         if (this.outgoing.size === 0)  {
-            throw new Error(`[${this.id}]: No output transport has been registered.`);
+            return Promise.reject(new Error(`[${this.id}]: No output transport has been registered.`));
         }
 
         msg = Object.assign({}, msg, {      // Clone message so it can be modified.
@@ -372,19 +372,31 @@ export class CommsBridge implements ICommsBridge {
 
             if (result) {
                 if (result.then) {
-                    result.then((asyncResult: any) => {
-                            //
-                            // Make a reply to the message.
-                            //
-                            this.send({
-                                transportId: incomingTransportId,
-                                replyId: msg.id,
-                                targetId: msg.senderId!,
-                                payload: asyncResult,
-                            });
-                        })
+                    //
+                    // Assume the result of the handler is a promise.
+                    //
+                    result
                         .catch((err: any) => {
                             console.error(`[${this.id}]: Failed running asynchronous response handler "${msg.name}":`);
+                            console.error(err && err.stack || err);
+                        })
+                        .then((asyncResult: any) => {
+                            if (asyncResult) {
+                                //
+                                // The handler returned an asynchronous result that can be returned as a reply.
+                                //
+                                // So make a reply to the message:
+                                //
+                                return this.send({
+                                    transportId: incomingTransportId,
+                                    replyId: msg.id,
+                                    targetId: msg.senderId!,
+                                    payload: asyncResult,
+                                });
+                            }
+                        })
+                        .catch((err: any) => {
+                            console.error(`[${this.id}]: Failed sending reply to message "${msg.id}":`);
                             console.error(err && err.stack || err);
                         });
                 }
@@ -393,11 +405,15 @@ export class CommsBridge implements ICommsBridge {
                     // Make a reply to the message.
                     //
                     this.send({ 
-                        transportId: incomingTransportId,
-                        replyId: msg.id,
-                        targetId: msg.senderId!,
-                        payload: result,
-                    });
+                            transportId: incomingTransportId,
+                            replyId: msg.id,
+                            targetId: msg.senderId!,
+                            payload: result,
+                        })
+                        .then((err: any) => {
+                            console.error(`[${this.id}]: Failed sending reply to message "${msg.id}":`);
+                            console.error(err && err.stack || err);
+                        });
                 }
             }
         }
