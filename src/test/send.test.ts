@@ -1,4 +1,4 @@
-import { CommsBridge, IMessage, onIncomingMessageFn } from "../index";
+import { CommsBridge, IMessage, IPackage, onIncomingMessageFn } from "../index";
 
 describe("sending", () => {
 
@@ -12,22 +12,21 @@ describe("sending", () => {
         const commsBridge = new CommsBridge(instanceId);
 
         commsBridge.addOutgoing("outgoing-id-1", {
-            send: (msg: IMessage) => {
-                expect(msg.name).toEqual(messageName);
-                expect(msg.senderId).toEqual(instanceId);
+            send: (pkg: IPackage) => {
+                expect(pkg.msg.name).toEqual(messageName);
+                expect(pkg.senderId).toEqual(instanceId);
                 messagesSent += 1;
             },
         });
         commsBridge.addOutgoing("outgoing-id-2", {
-            send: (msg: IMessage) => {
-                expect(msg.name).toEqual(messageName);
-                expect(msg.senderId).toEqual(instanceId);
+            send: (pkg: IPackage) => {
+                expect(pkg.msg.name).toEqual(messageName);
+                expect(pkg.senderId).toEqual(instanceId);
                 messagesSent += 1;
             },
         });
 
         await commsBridge.send({
-            senderId: "this-gets-overwritten",
             targetId: "some-one-else", 
             name: messageName, 
             payload: messagePayload
@@ -46,23 +45,22 @@ describe("sending", () => {
         const commsBridge = new CommsBridge(instanceId);
 
         commsBridge.addOutgoing("outgoing-id-1", {
-            send: (msg: IMessage) => {
-                expect(msg.name).toEqual(messageName);
-                expect(msg.senderId).toEqual(instanceId);
+            send: (pkg: IPackage) => {
+                expect(pkg.msg.name).toEqual(messageName);
+                expect(pkg.senderId).toEqual(instanceId);
                 messagesSent += 1;
             },
         });
         commsBridge.addOutgoing("outgoing-id-2", {
-            send: (msg: IMessage) => {
-                expect(msg.name).toEqual(messageName);
-                expect(msg.senderId).toEqual(instanceId);
+            send: (pkg: IPackage) => {
+                expect(pkg.msg.name).toEqual(messageName);
+                expect(pkg.senderId).toEqual(instanceId);
                 messagesSent += 1;
             },
         });
 
         await commsBridge.send({
             transportId: "outgoing-id-1",
-            senderId: "this-gets-overwritten",
             targetId: "some-one-else", 
             name: messageName, 
             payload: messagePayload
@@ -80,14 +78,16 @@ describe("sending", () => {
 
         let incomingMessageHandler: onIncomingMessageFn | undefined = undefined;
         const mockOutgoing: any = {
-            send: (msg: IMessage) => {
+            send: (msg: IPackage) => {
                 //
                 // Simulate a reply coming back.
                 //
                 incomingMessageHandler!({
-                    targetId: instanceId,
                     replyId: msg.id,
-                    payload: replyPayload,
+                    msg: {
+                        targetId: instanceId,
+                        payload: replyPayload,
+                    },
                 });
             },
         };
@@ -120,7 +120,7 @@ describe("sending", () => {
 
         let incomingMessageHandler: onIncomingMessageFn | undefined = undefined;
         const mockOutgoing: any = {
-            send: (msg: IMessage) => {
+            send: (msg: IPackage) => {
                 // Don't reply to message... let the timeout be invoked.
             },
         };

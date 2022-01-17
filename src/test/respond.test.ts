@@ -1,4 +1,4 @@
-import { CommsBridge, IMessage, onIncomingMessageFn } from "../index";
+import { CommsBridge, IMessage, IPackage, onIncomingMessageFn } from "../index";
 
 describe("receiving", () => {
 
@@ -8,9 +8,11 @@ describe("receiving", () => {
         const id = "my-instance-id";
         const messagePayload = {};
         const mockMessage: any = {            
-            targetId: id,
-            name: "an-event",
-            payload: messagePayload,
+            msg: {
+                targetId: id,
+                name: "an-event",
+                payload: messagePayload,
+            },
         };
 
         const commsBridge = new CommsBridge(id);
@@ -44,9 +46,11 @@ describe("receiving", () => {
 
         const id = "my-instance-id";
         const mockMessage: any = {            
-            targetId: id,
-            name: "an-event",
-            payload: {},
+            msg: {
+                targetId: id,
+                name: "an-event",
+                payload: {},
+            },
         };
 
         const commsBridge = new CommsBridge(id);
@@ -71,10 +75,12 @@ describe("receiving", () => {
         let messageForwarded = false;
         const id = "my-instance-id";
         const messagePayload = {};
-        const mockMessage: any = {            
-            targetId: "some-other-instance-id",
-            name: "an-event",
-            payload: messagePayload,
+        const mockMessage: any = {
+            msg: {            
+                targetId: "some-other-instance-id",
+                name: "an-event",
+                payload: messagePayload,
+            },
         };
 
         const commsBridge = new CommsBridge(id);
@@ -88,7 +94,7 @@ describe("receiving", () => {
         commsBridge.addIncoming("incoming-id", mockIncoming);
 
         commsBridge.addOutgoing("outgoing-id", {
-            send: (msg: IMessage) => {
+            send: (msg: IPackage) => {
                 expect(msg).toBe(mockMessage);
                 messageForwarded = true;
             },
@@ -108,9 +114,11 @@ describe("receiving", () => {
         const id = "my-instance-id";
         const messagePayload = {};
         const mockMessage: any = {            
-            targetId: id,
-            name: "an-event",
-            payload: messagePayload,
+            msg: {
+                targetId: id,
+                name: "an-event",
+                payload: messagePayload,
+            },
         };
         const responseResult = {};
 
@@ -129,8 +137,8 @@ describe("receiving", () => {
         commsBridge.addIncoming("transport-id", mockIncoming);
 
         commsBridge.addOutgoing("transport-id", {
-            send: (msg: IMessage) => {
-                expect(msg.payload).toEqual(responseResult);
+            send: (pkg: IPackage) => {
+                expect(pkg.msg.payload).toEqual(responseResult);
                 done(); // Finishes the test.
             },
         });
@@ -146,9 +154,11 @@ describe("receiving", () => {
         const id = "my-instance-id";
         const messagePayload = {};
         const mockMessage: any = {            
-            targetId: id,
-            name: "an-event",
-            payload: messagePayload,
+            msg: {
+                targetId: id,
+                name: "an-event",
+                payload: messagePayload,
+            },
         };
         const responseResult = {};
 
@@ -167,8 +177,8 @@ describe("receiving", () => {
         commsBridge.addIncoming("transport-id", mockIncoming);
 
         commsBridge.addOutgoing("transport-id", {
-            send: (msg: IMessage) => {
-                expect(msg.payload).toEqual(responseResult);
+            send: (pkg: IPackage) => {
+                expect(pkg.msg.payload).toEqual(responseResult);
                 done(); // Finishes the test.
             },
         });
@@ -178,52 +188,16 @@ describe("receiving", () => {
         // Note the test is finished by the call to the `done` function.
     });
 
-    //
-    // TODO: This should be the test that sends a reply.
-    //       Also need a variant for a sync result.
-    //
-    // it("respond handler can return an async result", async () => {
-
-    //     const id = "my-instance-id";
-    //     const mockMessage: any = {   
-    //         targetId: id,         
-    //         name: "an-event",
-    //         payload: {},
-    //     };
-    //     const expectedResult = [1, 2, 3];
-
-    //     const commsBridge = new CommsBridge(id);
-    //     commsBridge.respond("an-event", (payload: any) => {
-    //         return Promise.resolve(expectedResult);
-    //     });
-
-    //     let incomingMessageHandler: any = undefined;
-    //     const mockIncoming: any = {
-    //         connect: (handler: any) => {
-    //             incomingMessageHandler = handler;
-    //         },
-    //     };
-    //     commsBridge.addIncoming("my-transport-id", mockIncoming);
-
-    //     //
-    //     // Handle the message and await the result.
-    //     //
-    //     const result = await incomingMessageHandler(mockMessage);
-
-    //     //
-    //     // Check the message was received by the handler.
-    //     //
-    //     expect(result).toEqual(expectedResult);
-    // });    
-
     it("can deregister an incoming transport", () => {
 
         let disconnectInvoked = false;
         const id = "my-instance-id";
         const transportId = "my-transport-id";
         const mockMessage: any = {            
-            name: "an-event",
-            payload: {},
+            msg: {
+                name: "an-event",
+                payload: {},
+            },
         };
 
         const commsBridge = new CommsBridge(id);
@@ -258,9 +232,11 @@ describe("receiving", () => {
 
         let messageReceived = false;
         const mockMessage: any = {     
-            targetId: "some-other-instance-id", // Targeting some other instance.
-            name: "an-event",
-            payload: {},
+            msg: {
+                targetId: "some-other-instance-id", // Targeting some other instance.
+                name: "an-event",
+                payload: {},
+            },
         };
 
         const commsBridge = new CommsBridge("my-instance-id");

@@ -8,34 +8,14 @@
 export interface IMessage<PayloadT = any> {
 
     //
-    // The ID of the message, attached by the comms bridge.
-    //
-    id?: number;
-
-    //
     // Set to target the message at a particular outgoing transport.
     //
     transportId?: string;
 
     //
-    // Only set when the message is a reply to another message that is requiring resolution.
-    //
-    replyId?: number;
-
-    //
-    // The sender of the message.
-    //
-    senderId?: string;
-
-    //
     // The target of the message.
     //
     targetId: string;
-
-    //
-    // The id of the instance that last forwarded the message.
-    //
-    forwarderId?: string;
 
     //
     // Message name.
@@ -50,9 +30,39 @@ export interface IMessage<PayloadT = any> {
 }
 
 //
+// "Packages" a message in a structure so that internal details (like id and replyId) don't get unecessarily leaked to users of this library.
+//
+export interface IPackage<PayloadT = any> {
+    //
+    // The ID of the message, attached by the comms bridge.
+    //
+    id?: number;
+
+    //
+    // Only set when the message is a reply to another message that is requiring resolution.
+    //
+    replyId?: number;
+
+    //
+    // The sender of the message.
+    //
+    senderId?: string;
+
+    //
+    // The id of the instance that last forwarded the message.
+    //
+    forwarderId?: string;
+
+    //
+    // The wrapped message.
+    //
+    msg: IMessage<PayloadT>;
+}
+
+//
 // Defines a handler for messages incoming from a transport.
 //
-export type onIncomingMessageFn = (msg: IMessage) => void;
+export type onIncomingMessageFn = (pkg: IPackage) => void;
 
 //
 // Allows new types of network transports for incoming message to be plugged into 
@@ -80,7 +90,7 @@ export interface IOutgoingTransport {
     //
     // Plugin function to send a message.
     //
-    send<PayloadT = any>(msg: IMessage<PayloadT>, options?: ISendOptions): void;
+    send<PayloadT = any>(pkg: IPackage<PayloadT>, options?: ISendOptions): void;
 }
 
 export type RespondHandlerFn<PayloadT = any, ResultT = any> = (msg: IMessage<PayloadT>) => void | ResultT | Promise<void | ResultT>;
@@ -218,36 +228,37 @@ export class CommsBridge implements ICommsBridge {
         if (this.outgoing.size === 0)  {
             return Promise.reject(new Error(`[${this.id}]: No output transport has been registered.`));
         }
-
-        msg = Object.assign({}, msg, {      // Clone message so it can be modified.
-            senderId: this.id,              // Auto tag with sender id.
+        
+        const wrappedMessage = {
             id: this.nextId++,              // Auto tag with next message id.
-        }); 
+            senderId: this.id,              // Auto tag with sender id.
+            msg: msg,
+        };
 
         if (options?.awaitReply) {
-            console.log(`[${this.id}]: Awaiting a reply for message ${msg.id}.`);
+            console.log(`[${this.id}]: Awaiting a reply for message ${wrappedMessage.id}.`);
 
             return new Promise<ResultT>((resolve, reject) => {
                 // Set a timeout if a response is not received
                 const timeout = setTimeout(() => {
-                    const req = this.pendingResponses.get(msg.id!);
+                    const req = this.pendingResponses.get(wrappedMessage.id!);
                     if (req) {
-                        this.pendingResponses.delete(msg.id!);
+                        this.pendingResponses.delete(wrappedMessage.id!);
     
-                        reject(new Error(`[${this.id}]: Timeout expired waiting for response to message ${msg.id}.`));
+                        reject(new Error(`[${this.id}]: Timeout expired waiting for response to message ${wrappedMessage.id}.`));
                     }
                 }, options?.timeout || this.defaultTimeout);
     
-                this.pendingResponses.set(msg.id!, {
+                this.pendingResponses.set(wrappedMessage.id!, {
                     timeout,
                     resolve
                 });
 
-                this._send(msg);
+                this._send(wrappedMessage);
             });
         }
         else {
-            this._send(msg);
+            this._send(wrappedMessage);
             return Promise.resolve(undefined);
         }
     }
@@ -255,20 +266,20 @@ export class CommsBridge implements ICommsBridge {
     //
     // Internal send function to reduce duplicated code.
     //
-    private _send(msg: IMessage) {
+    private _send(pkg: IPackage) {
 
-        if (msg.transportId) {
+        if (pkg.msg.transportId) {
             //
             // Send to via a particular outgoing transport.
             // This is important for replies where sending to one "party" is 
             // way more efficient than broadcasting to all "parties".
             //
-            const outgoingTransport = this.outgoing.get(msg.transportId);
+            const outgoingTransport = this.outgoing.get(pkg.msg.transportId);
             if (!outgoingTransport) {
-                throw new Error(`[${this.id}]: Outgoing transport "${msg.transportId}" referenced by msg ${msg.id} not found, you may need to add it.`);
+                throw new Error(`[${this.id}]: Outgoing transport "${pkg.msg.transportId}" referenced by msg ${pkg.id} not found, you may need to add it.`);
             }
             else {
-                outgoingTransport.send(msg);
+                outgoingTransport.send(pkg);
             }
         }
         else {
@@ -276,7 +287,7 @@ export class CommsBridge implements ICommsBridge {
             // Broadcast across all outgoing transports.
             //
             for (const outgoingTransport of this.outgoing.values()) {
-                outgoingTransport.send(msg);
+                outgoingTransport.send(pkg);
             }
         }
     }
@@ -284,30 +295,30 @@ export class CommsBridge implements ICommsBridge {
     //
     // Handles incoming messages from incoming transports.
     //
-    private handleIncomingMessage(incomingTransportId: string, msg: IMessage): void {
+    private handleIncomingMessage(incomingTransportId: string, pkg: IPackage): void {
         // console.log(`[${this.id}]: Incoming message on comms bridge from ${incomingTransportId}:`);
         // console.log(msg);
 
-        if (msg.forwarderId === this.id) {
+        if (pkg.forwarderId === this.id) {
             //
             // We already forwarded this message, just ignore it.
             //
             return;
         }
         
-        if (msg.senderId === this.id) {
+        if (pkg.senderId === this.id) {
             //
             // We sent this message, just ignore it.
             //
             return;
         }
         
-        if (msg.targetId !== this.id) {
+        if (pkg.msg.targetId !== this.id) {
             //
             // Forwards messages that are not intended for this instance.
             //
 
-            console.log(`[${this.id}]: Forwarding message to ${msg.targetId}`);
+            console.log(`[${this.id}]: Forwarding message to ${pkg.msg.targetId}`);
 
             if (this.outgoing.size === 0)  {
                 console.error(`[${this.id}]: No output transport has been registered.`);
@@ -316,45 +327,45 @@ export class CommsBridge implements ICommsBridge {
             //
             // Stamp it with our id, to avoid double handling.
             //
-            msg.forwarderId = this.id; 
+            pkg.forwarderId = this.id; 
 
             for (const outgoingTransport of this.outgoing.values()) {
-                outgoingTransport.send(msg);                    
+                outgoingTransport.send(pkg);                    
             }    
 
             return;
         }
 
-        if (msg.replyId !== undefined) {
+        if (pkg.replyId !== undefined) {
             // 
             // Processes a reply to a message.
             // 
-            const pending = this.pendingResponses.get(msg.replyId);
+            const pending = this.pendingResponses.get(pkg.replyId);
             if (pending) {
-                console.log(`[${this.id}]: Found message ${msg.replyId} awaiting reply, resolving it.`);
+                console.log(`[${this.id}]: Found message ${pkg.replyId} awaiting reply, resolving it.`);
 
                 clearTimeout(pending.timeout);
 
-                this.pendingResponses.delete(msg.replyId);
+                this.pendingResponses.delete(pkg.replyId);
 
                 //
                 // Delivers the response payload to the caller of the "send" function.
                 //
-                pending.resolve(msg.payload); 
+                pending.resolve(pkg.msg.payload); 
             }
             else {
-                console.log(`[${this.id}]: No messsage be waited on for ${msg.replyId}.`);
+                console.log(`[${this.id}]: No messsage be waited on for ${pkg.replyId}.`);
             }
 
             return;
         }
 
-        if (!msg.name) {
+        if (!pkg.msg.name) {
             console.error(`[${this.id}]: Name is not set for this message, unable to handle it.`);
             return;
         }
 
-        const responseHandler = this.responseHandlers.get(msg.name);
+        const responseHandler = this.responseHandlers.get(pkg.msg.name);
         if (responseHandler) { 
             // console.log(`[${this.id}]: Invoking handler for "${msg.name}"`);
 
@@ -363,10 +374,10 @@ export class CommsBridge implements ICommsBridge {
             //
             let result: any;
             try {
-                result = responseHandler(msg.payload); 
+                result = responseHandler(pkg.msg.payload); 
             }
             catch (err: any) {
-                console.error(`[${this.id}]: Failed running synchronous response handler "${msg.name}":`);
+                console.error(`[${this.id}]: Failed running synchronous response handler "${pkg.msg.name}":`);
                 console.error(err && err.stack || err);
             }
 
@@ -377,7 +388,7 @@ export class CommsBridge implements ICommsBridge {
                     //
                     result
                         .catch((err: any) => {
-                            console.error(`[${this.id}]: Failed running asynchronous response handler "${msg.name}":`);
+                            console.error(`[${this.id}]: Failed running asynchronous response handler "${pkg.msg.name}":`);
                             console.error(err && err.stack || err);
                         })
                         .then((asyncResult: any) => {
@@ -387,38 +398,44 @@ export class CommsBridge implements ICommsBridge {
                                 //
                                 // So make a reply to the message:
                                 //
-                                return this.send({
-                                    transportId: incomingTransportId,
-                                    replyId: msg.id,
-                                    targetId: msg.senderId!,
-                                    payload: asyncResult,
+                                this._send({
+                                    id: this.nextId++,
+                                    senderId: this.id,
+                                    replyId: pkg.id,
+                                    msg: {
+                                        transportId: incomingTransportId,
+                                        targetId: pkg.senderId!,
+                                        payload: asyncResult,
+                                    },
                                 });
                             }
                         })
                         .catch((err: any) => {
-                            console.error(`[${this.id}]: Failed sending reply to message "${msg.id}":`);
+                            console.error(`[${this.id}]: Failed sending reply to message "${pkg.id}":`);
                             console.error(err && err.stack || err);
                         });
                 }
                 else {
                     //
-                    // Make a reply to the message.
+                    // The handler returned an synchronous result that can be returned as a reply.
                     //
-                    this.send({ 
+                    // So make a reply to the message:
+                    //
+                    this._send({
+                        id: this.nextId++,
+                        senderId: this.id,
+                        replyId: pkg.id,
+                        msg: {
                             transportId: incomingTransportId,
-                            replyId: msg.id,
-                            targetId: msg.senderId!,
+                            targetId: pkg.senderId!,
                             payload: result,
-                        })
-                        .then((err: any) => {
-                            console.error(`[${this.id}]: Failed sending reply to message "${msg.id}":`);
-                            console.error(err && err.stack || err);
-                        });
+                        },
+                    });
                 }
             }
         }
         else {
-            console.error(`[${this.id}]: No response handler defined for message: ${msg.name}`);
+            console.error(`[${this.id}]: No response handler defined for message: ${pkg.msg.name}`);
         }        
     }
 
