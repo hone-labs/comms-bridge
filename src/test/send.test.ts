@@ -71,6 +71,34 @@ describe("sending", () => {
 
         expect(replyResult).toBe(replyPayload);
     });
+
+    it("send message times out when reply is not received", async () => {
+
+        const instanceId = "this-is-me";
+
+        const commsBridge = new CommsBridge(instanceId);
+
+        let incomingMessageHandler: onIncomingMessageFn | undefined = undefined;
+        const mockOutgoing: any = {
+            send: (msg: IMessage) => {
+                // Don't reply to message... let the timeout be invoked.
+            },
+        };
+        commsBridge.addOutgoing("my-outgoing-id", mockOutgoing);
+
+        await expect(() => commsBridge.send(
+                {
+                    targetId: "this-is-someone-else", 
+                },
+                {
+                    awaitReply: true,
+                    timeout: 1,
+                }
+            ))
+            .rejects
+            .toThrow();
+    });
+
     it("throws when outgoing transport is not registered", async () => {
 
         const instanceId = "this-is-me";
