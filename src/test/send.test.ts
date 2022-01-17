@@ -2,33 +2,73 @@ import { CommsBridge, IMessage, onIncomingMessageFn } from "../index";
 
 describe("sending", () => {
 
-    it("can send outgoing message", async () => {
+    it("can send outgoing message on all transports", async () => {
 
-        let messageSent = false;
+        let messagesSent = 0;
         const instanceId = "this-is-me";
-        const outgoingId = "this-is-someone-else";
         const messageName = "some-kind-of-message";
         const messagePayload = {};
 
         const commsBridge = new CommsBridge(instanceId);
 
-        const mockOutgoing: any = {
+        commsBridge.addOutgoing("outgoing-id-1", {
             send: (msg: IMessage) => {
                 expect(msg.name).toEqual(messageName);
                 expect(msg.senderId).toEqual(instanceId);
-                messageSent = true;
+                messagesSent += 1;
             },
-        };
-        commsBridge.addOutgoing(outgoingId, mockOutgoing);
+        });
+        commsBridge.addOutgoing("outgoing-id-2", {
+            send: (msg: IMessage) => {
+                expect(msg.name).toEqual(messageName);
+                expect(msg.senderId).toEqual(instanceId);
+                messagesSent += 1;
+            },
+        });
 
         await commsBridge.send({
             senderId: "this-gets-overwritten",
-            targetId: outgoingId, 
+            targetId: "some-one-else", 
             name: messageName, 
             payload: messagePayload
         });
 
-        expect(messageSent).toEqual(true);
+        expect(messagesSent).toEqual(2);
+    });
+
+    it("can send outgoing message on a particular transport", async () => {
+
+        let messagesSent = 0;
+        const instanceId = "this-is-me";
+        const messageName = "some-kind-of-message";
+        const messagePayload = {};
+
+        const commsBridge = new CommsBridge(instanceId);
+
+        commsBridge.addOutgoing("outgoing-id-1", {
+            send: (msg: IMessage) => {
+                expect(msg.name).toEqual(messageName);
+                expect(msg.senderId).toEqual(instanceId);
+                messagesSent += 1;
+            },
+        });
+        commsBridge.addOutgoing("outgoing-id-2", {
+            send: (msg: IMessage) => {
+                expect(msg.name).toEqual(messageName);
+                expect(msg.senderId).toEqual(instanceId);
+                messagesSent += 1;
+            },
+        });
+
+        await commsBridge.send({
+            transportId: "outgoing-id-1",
+            senderId: "this-gets-overwritten",
+            targetId: "some-one-else", 
+            name: messageName, 
+            payload: messagePayload
+        });
+
+        expect(messagesSent).toEqual(1);
     });
 
     it("can recieve reply from message sent", async () => {
@@ -117,7 +157,8 @@ describe("sending", () => {
     it("can deregister an outgoing transport", async () => {
 
         const instanceId = "this-is-me";
-        const outgoingId = "this-is-someone-else";
+        const transportId = "my-transport-id";
+        const targetId = "this-is-someone-else";
         const messageName = "some-kind-of-message";
         const messagePayload = {};
         const expectedResult = [1, 2, 3];
@@ -129,20 +170,20 @@ describe("sending", () => {
                 return Promise.resolve(expectedResult);
             },
         };
-        commsBridge.addOutgoing(outgoingId, mockOutgoing);
+        commsBridge.addOutgoing(transportId, mockOutgoing);
 
         // Works fine.
         await commsBridge.send({ 
-            targetId: outgoingId, 
+            targetId: targetId, 
             name: messageName, 
             payload: messagePayload
         });
 
-        commsBridge.removeOutgoing(outgoingId);
+        commsBridge.removeOutgoing(transportId);
 
         // Throws now.
         await expect(() => 
-                commsBridge.send({ targetId: outgoingId, name: messageName, payload: messagePayload })
+                commsBridge.send({ targetId: targetId, name: messageName, payload: messagePayload })
             )
             .rejects.toThrow();
     });
