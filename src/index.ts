@@ -227,7 +227,7 @@ export class CommsBridge implements ICommsBridge {
         if (options?.awaitReply) {
             console.log(`[${this.id}]: Awaiting a reply for message ${msg.id}.`);
 
-            return new Promise<ResultT>((resolve, reject) => { //todo: test me!
+            return new Promise<ResultT>((resolve, reject) => {
                 // Set a timeout if a response is not received
                 const timeout = setTimeout(() => {
                     const req = this.pendingResponses.get(msg.id!);

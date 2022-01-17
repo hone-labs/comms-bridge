@@ -1,4 +1,4 @@
-import { CommsBridge, IMessage } from "../index";
+import { CommsBridge, IMessage, onIncomingMessageFn } from "../index";
 
 describe("sending", () => {
 
@@ -31,6 +31,46 @@ describe("sending", () => {
         expect(messageSent).toEqual(true);
     });
 
+    it("can recieve reply from message sent", async () => {
+
+        const instanceId = "this-is-me";
+        const replyPayload = {};
+
+        const commsBridge = new CommsBridge(instanceId);
+
+        let incomingMessageHandler: onIncomingMessageFn | undefined = undefined;
+        const mockOutgoing: any = {
+            send: (msg: IMessage) => {
+                //
+                // Simulate a reply coming back.
+                //
+                incomingMessageHandler!({
+                    targetId: instanceId,
+                    replyId: msg.id,
+                    payload: replyPayload,
+                });
+            },
+        };
+        commsBridge.addOutgoing("my-outgoing-id", mockOutgoing);
+
+        const mockIncoming: any = {
+            connect: (handler: onIncomingMessageFn) => {
+                incomingMessageHandler = handler;
+            },
+        };
+        commsBridge.addIncoming("my-incoming-id", mockIncoming);
+
+        const replyResult = await commsBridge.send(
+            {
+                targetId: "this-is-someone-else", 
+            },
+            {
+                awaitReply: true,
+            }
+        );
+
+        expect(replyResult).toBe(replyPayload);
+    });
     it("throws when outgoing transport is not registered", async () => {
 
         const instanceId = "this-is-me";
