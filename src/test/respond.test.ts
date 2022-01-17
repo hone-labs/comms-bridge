@@ -1,8 +1,8 @@
-import { CommsBridge } from "../index";
+import { CommsBridge, onIncomingMessageFn } from "../index";
 
 describe("receiving", () => {
 
-    it("can handle incoming message", async () => {
+    it("can handle incoming message", () => {
 
         let messageReceived = false;
         const id = "my-instance-id";
@@ -19,9 +19,9 @@ describe("receiving", () => {
             messageReceived = true;
         });
 
-        let incomingMessageHandler: any = undefined;
+        let incomingMessageHandler: onIncomingMessageFn | undefined = undefined;
         const mockIncoming: any = {
-            connect: (handler: any) => {
+            connect: (handler: onIncomingMessageFn) => {
                 incomingMessageHandler = handler;
             },
         };
@@ -32,7 +32,7 @@ describe("receiving", () => {
         //
         expect(incomingMessageHandler).toBeDefined();
 
-        await incomingMessageHandler(mockMessage);
+        incomingMessageHandler!(mockMessage);
 
         //
         // Check the message was received by the handler.
@@ -40,7 +40,7 @@ describe("receiving", () => {
         expect(messageReceived).toEqual(true);
     });
 
-    it("doesn't throw when no handler for a message is registered", async () => {
+    it("doesn't throw when no handler for a message is registered", () => {
 
         const id = "my-instance-id";
         const mockMessage: any = {            
@@ -51,9 +51,9 @@ describe("receiving", () => {
 
         const commsBridge = new CommsBridge(id);
 
-        let incomingMessageHandler: any = undefined;
+        let incomingMessageHandler: onIncomingMessageFn | undefined = undefined;
         const mockIncoming: any = {
-            connect: (handler: any) => {
+            connect: (handler: onIncomingMessageFn) => {
                 incomingMessageHandler = handler;
             },
         };
@@ -63,7 +63,7 @@ describe("receiving", () => {
         // "Send" the message.
         //
         expect(incomingMessageHandler).toBeDefined();
-        await incomingMessageHandler(mockMessage);
+        incomingMessageHandler!(mockMessage);
     });
 
     //
@@ -104,7 +104,7 @@ describe("receiving", () => {
     //     expect(result).toEqual(expectedResult);
     // });    
 
-    it("can deregister an incoming transport", async () => {
+    it("can deregister an incoming transport", () => {
 
         let disconnectInvoked = false;
         const id = "my-instance-id";
@@ -119,9 +119,9 @@ describe("receiving", () => {
             return Promise.resolve({});
         });
 
-        let incomingMessageHandler: any = undefined;
+        let incomingMessageHandler: onIncomingMessageFn | undefined = undefined;
         const mockIncoming: any = {
-            connect: (handler: any) => {
+            connect: (handler: onIncomingMessageFn) => {
                 incomingMessageHandler = handler;
             },
             disconnect: () => {
@@ -131,7 +131,7 @@ describe("receiving", () => {
         commsBridge.addIncoming(transportId, mockIncoming);
 
         // Handler added, this executes ok.
-        await incomingMessageHandler(mockMessage);
+        incomingMessageHandler!(mockMessage);
 
         commsBridge.removeIncoming(transportId);
 
@@ -157,9 +157,9 @@ describe("receiving", () => {
             messageReceived = true;
         });
 
-        let incomingMessageHandler: any = undefined;
+        let incomingMessageHandler: onIncomingMessageFn | undefined = undefined;
         const mockIncoming: any = {
-            connect: (handler: any) => {
+            connect: (handler: onIncomingMessageFn) => {
                 incomingMessageHandler = handler;
             },
         };
@@ -169,7 +169,7 @@ describe("receiving", () => {
         // "Send" the message.
         //
         expect(incomingMessageHandler).toBeDefined();
-        await incomingMessageHandler(mockMessage);
+        incomingMessageHandler!(mockMessage);
 
         //
         // Check the message wasn't received by the handler.
