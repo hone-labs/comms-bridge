@@ -102,6 +102,44 @@ describe("receiving", () => {
         expect(messageForwarded).toEqual(true);        
     });
 
+    it("sync result from the response handler sends a reply message", done => {
+
+        let replySent = false;
+        const id = "my-instance-id";
+        const messagePayload = {};
+        const mockMessage: any = {            
+            targetId: id,
+            name: "an-event",
+            payload: messagePayload,
+        };
+        const responseResult = {};
+
+        const commsBridge = new CommsBridge(id);
+        commsBridge.respond("an-event", (payload: any)=> {
+            expect(payload).toEqual(messagePayload);
+            return responseResult;
+        });
+
+        let incomingMessageHandler: onIncomingMessageFn | undefined = undefined;
+        const mockIncoming: any = {
+            connect: (handler: onIncomingMessageFn) => {
+                incomingMessageHandler = handler;
+            },
+        };
+        commsBridge.addIncoming("transport-id", mockIncoming);
+
+        commsBridge.addOutgoing("transport-id", {
+            send: (msg: IMessage) => {
+                expect(msg.payload).toEqual(responseResult);
+                done(); // Finishes the test.
+            },
+        });
+
+        incomingMessageHandler!(mockMessage);
+
+        // Note the test is finished by the call to the `done` function.
+    });
+
     it("async result from the response handler sends a reply message", done => {
 
         let replySent = false;
